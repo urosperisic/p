@@ -1,0 +1,129 @@
+sudo dnf install postgresql postgresql-server postgresql-contrib
+
+sudo postgresql-setup --initdb
+
+sudo systemctl enable --now postgresql
+
+sudo systemctl status postgresql
+
+pg_isready
+
+sudo -u postgres psql
+
+CREATE DATABASE drfdb;
+CREATE USER drfdb_user WITH PASSWORD 'yourpassword';
+ALTER ROLE drfdb_user SET client_encoding TO 'utf8';
+ALTER ROLE drfdb_user SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE drfdb TO drfdb_user;
+\c drfdb
+GRANT ALL ON SCHEMA public TO drfdb_user;
+\q
+
+sudo find / -name "pg_hba.conf" 2>/dev/null
+
+sudo nano /var/lib/pgsql/data/pg_hba.conf
+
+local   all             all                                     md5 [scram-sha-256]
+host    all             all             127.0.0.1/32            md5 [scram-sha-256]
+
+sudo systemctl restart postgresql
+
+psql -U drfdb_user -h 127.0.0.1 -d drfdb
+
+\l
+\du
+\c drfdb
+\dt
+\q
+
+--------------------
+--------------------
+
+git config --global user.name "username"
+git config --global user.email "your@email.com"
+
+ssh-keygen -t ed25519 -C "your@email.com"
+cat ~/.ssh/id_ed25519.pub
+ssh -T git@github.com
+git clone git@github.com:username/repo.git
+ssh root@
+
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+
+--------------------
+--------------------
+
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install
+
+mkdir patterns
+cd patterns
+
+uv init
+uv venv --python ~/.local/bin/python3.14
+source .venv/bin/activate
+
+uv add django djangorestframework django-environ ruff ty pre-commit pytest pytest-django django-cors-headers django-axes [uv pip install django ...]
+uv sync [uv pip freeze > requirements.txt, uv pip install requirements.txt]
+pre-commit install
+
+mkdir -p .helix
+
+cat > .helix/languages.toml <<'EOF'
+[[language]]
+name = "python"
+language-servers = ["ty"]
+formatter = { command = "ruff", args = ["format", "-"] }
+auto-format = true
+EOF
+
+hx --health python
+
+uv run python manage.py check --deploy
+DJANGO_SETTINGS_MODULE=config.settings.production DEBUG=False python manage.py check --deploy
+
+--------------------
+--------------------
+
+SECRET_KEY=random
+DEBUG=True
+ALLOWED_HOSTS=127.0.0.1,localhost
+DATABASE_URL=postgres://user:password@127.0.0.1:5432/db
+
+VITE_API_URL=http://localhost:8000
+
+python -c "import secrets; print(secrets.token_urlsafe(50))"
+
+--------------------
+--------------------
+
+curl -c cookies.txt -b cookies.txt http://localhost:8000/api/auth/csrf/
+
+curl -c cookies.txt -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"username":"pera","email":"pera@example.com","password":"pass"}' \
+  http://localhost:8000/api/auth/register/
+
+curl -b cookies.txt http://localhost:8000/api/auth/me/
+
+curl -c cookies.txt -b cookies.txt \
+  -X POST \
+  -H "X-CSRFToken: $(grep csrftoken cookies.txt | awk '{print $7}')" \
+  http://localhost:8000/api/auth/logout/
+
+curl -c cookies.txt -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"username":"pera","password":"pass"}' \
+  http://localhost:8000/api/auth/login/
+
+curl -b cookies.txt http://localhost:8000/api/auth/me/
+
+curl -b cookies.txt \
+  -X POST \
+  -H "X-CSRFToken: $(grep csrftoken cookies.txt | awk '{print $7}')" \
+  http://localhost:8000/api/auth/logout/
+
+--------------------
+--------------------

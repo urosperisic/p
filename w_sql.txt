@@ -1,0 +1,146 @@
+FROM + JOIN → uzmi podatke
+WHERE → izbaci pojedinačne redove koji ne odgovaraju
+GROUP BY → napravi grupe
+COUNT(*) → prebroj redove u svakoj grupi
+HAVING → izbaci grupe koje imaju manje od 5
+SELECT → odredi šta će se prikazati
+
+----------
+
+from catalog.models import Author, Book
+
+tolkien = Author.objects.create(name="J.R.R. Tolkien", birth_year=1892)
+orwell = Author.objects.create(name="George Orwell", birth_year=1903)
+
+Book.objects.create(title="The Hobbit", author=tolkien, published_year=1937)
+Book.objects.create(title="The Lord of the Rings", author=tolkien, published_year=1954)
+Book.objects.create(title="1984", author=orwell, published_year=1949)
+Book.objects.create(title="Animal Farm", author=orwell, published_year=1945, is_available=False)
+
+Author.objects.all()
+Book.objects.all()
+Book.objects.filter(is_available=True)
+Book.objects.get(title="1984")
+Book.objects.filter(published_year__gte=1945)
+Book.objects.filter(author__name="George Orwell")
+
+---------- select_related
+
+from django.db import reset_queries, connection
+
+books = Book.objects.select_related("author")
+
+for b in books:
+    print(b.title, b.author.name)
+
+for c in connection.queries:
+    print(c["sql"])
+
+SELECT
+    "book"."id",
+    "book"."title",
+    "book"."author_id",
+    "book"."published_year",
+    "book"."is_available",
+    "author"."id",
+    "author"."name",
+    "author"."birth_year"
+FROM "book"
+INNER JOIN "author"
+    ON "book"."author_id" = "author"."id"; 
+
+author = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, blank=True, related_name='books') --- LEFT JOIN
+
+---------- prefetch_related
+
+authors = Author.objects.prefetch_related("books").all()
+
+for author in authors:
+    print(author.name, [b.title for b in author.books.all()])
+
+SELECT * FROM catalog_author
+SELECT * FROM catalog_book WHERE author_id IN (1, 2, ...)
+
+SELECT
+    "author"."id",
+    "author"."name",
+    "author"."birth_year"
+FROM "author"
+ORDER BY "author"."id" ASC;
+
+SELECT
+    "book"."id",
+    "book"."title",
+    "book"."author_id",
+    "book"."published_year",
+    "book"."is_available"
+FROM "book"
+WHERE "book"."author_id" IN (1, 2, 3);
+
+---------- annotate vs aggregate
+
+Book.objects.aggregate(Count('id'))
+SELECT COUNT(id) AS id__count FROM book;
+
+Book.objects.aggregate(total=Count('id'))
+SELECT COUNT(id) AS total FROM book;
+
+Book.objects.aggregate(avg_year=Avg('published_year'))
+SELECT AVG(published_year) AS avg_year FROM book;
+
+Author.objects.aggregate(oldest=Min('birth_year'), newest=Max('birth_year'))
+SELECT MIN(birth_year) AS oldest, MAX(birth_year) AS newest FROM author
+
+---
+
+authors = Author.objects.annotate(book_count=Count('books'))
+for a in authors:
+    print(a.name, a.book_count)
+
+SELECT
+    author.id,
+    author.name,
+    author.birth_year,
+    COUNT(book.id) AS book_count
+FROM author
+LEFT OUTER JOIN book
+    ON author.id = book.author_id
+GROUP BY author.id;
+
+---
+
+from django.db.models import Q
+
+authors = Author.objects.annotate(
+    available_count=Count('books', filter=Q(books__is_available=True))
+)
+for a in authors:
+    print(a.name, a.available_count)
+
+SELECT
+    author.id,
+    author.name,
+    author.birth_year,
+    COUNT(book.id) FILTER (WHERE book.is_available) AS available_count
+FROM author
+LEFT OUTER JOIN book
+    ON author.id = book.author_id
+GROUP BY author.id;
+
+---
+
+Author.objects.annotate(book_count=Count('books')).filter(book_count__gte=3)
+
+SELECT
+    author.id,
+    author.name,
+    author.birth_year,
+    COUNT(book.id) AS book_count
+FROM author
+LEFT OUTER JOIN book
+    ON author.id = book.author_id
+GROUP BY author.id
+HAVING COUNT(book.id) >= 3
+LIMIT 21;
+
+---
